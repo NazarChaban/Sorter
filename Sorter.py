@@ -99,8 +99,8 @@ def walker(main_dir, dirs_paths):
                                 # Додавання файлу в словник
                                 sorted_files[k].append(new_name)
                             except Exception:
-                                # print(f"Couldn't move file: {new_file_path}/n Exception: {Exception}")
-                                print(f'Something went wrong, but maybe everything is alright): {Exception}')
+                                None
+                                # print(f"Something went wrong, but don't worry, everything is alright): {Exception}")
         
         # Прохід порожніх папок
         if dirs:
@@ -131,7 +131,7 @@ def sorter():
     dirs = ['images', 'documents', 'audio', 'video', 'archives']
     dirs_paths = {}
     for direc in dirs:
-        os.mkdir(direc)
+        os.makedirs(direc, exist_ok=True)
         dirs_paths[direc] = (os.path.join(os.getcwd(), direc))
 
     # Сортування файлів
