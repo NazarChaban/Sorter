@@ -48,67 +48,72 @@ def walker(main_dir, dirs_paths):
     # Створення словника для зберігання файлів по категоріях
     sorted_files = {
         'images': [], 'video': [], 'documents': [],
-        'audio': [], 'archives': []
+        'audio': [], 'archives': [], 'unknown': []
     }
+    # Всі відомі розширення файлів
+    extensions = sum(KNOWN_EXT.values(), [])
 
-    # Обхід всіх файлів та папок
-    for root, dirs, files in os.walk(main_dir, topdown=False):
+    # Обхід всіх файлів, папок та їхнє сортування
+    for root, dirs, files in os.walk(main_dir, topdown=True):
         dirs[:] = [d for d in dirs if d not in (dirs_paths.keys())]
         
         # Прохходження файлів
-        if files:
-            for file in files:
-                # Переіменування файлу та створення дод. змінних
-                old_file_path = os.path.join(root, file)
-                name, ext = os.path.splitext(file)
-                new_name = normalize(name) + ext
-                new_file_path = os.path.join(root, new_name)
+        for file in files:
+            # Переіменування файлу та створення дод. змінних
+            old_file_path = os.path.join(root, file)
+            name, ext = os.path.splitext(file)
+            new_name = normalize(name) + ext
+            new_file_path = os.path.join(root, new_name)
 
-                os.rename(old_file_path, new_file_path)
-                
-                # Додавання розширення в відповідну множину
-                if ext.lower() in sum(KNOWN_EXT.values(), []):
-                    known_ext.add(ext.lower())
-                else:
-                    unknown_ext.add(ext.lower())
+            os.rename(old_file_path, new_file_path)
 
-                #Сортування файлів по категоріях
-                for k, v in KNOWN_EXT.items():
-                    if ext.lower() in v:
-                        # Сценарій для архіву
-                        if k == 'archives':
-                            arch_fold = os.path.splitext(new_name)[0]
-                            arch_path = os.path.join(main_dir, 'archives', arch_fold)
-                            # Створення директорії для архіву
-                            os.makedirs(arch_path, exist_ok=True)
-                            # Якщо архів справний, розпаковуємо
-                            try:
-                                shutil.unpack_archive(new_file_path, arch_path)
-                                # Додавання файлу в словник
-                                sorted_files[k].append(new_name)
-                            # Якщо архів битий, помилка
-                            except Exception:
-                                print(f"Couldn't unpack archieve: {new_file_path}/n Exception: {Exception}")
-                            # Видаляємо архів
-                            finally:
-                                os.remove(new_file_path)
-                        # Сценарій для решти файлів
-                        else:
-                            try:
-                                shutil.move(os.path.join(root, new_name), dirs_paths[k])
-                                # Додавання файлу в словник
-                                sorted_files[k].append(new_name)
-                            except Exception:
-                                None
-                                # print(f"Something went wrong, but don't worry, everything is alright): {Exception}")
-        
-        # Прохід порожніх папок
-        if dirs:
-            for direc in dirs:
-                dir_path = os.path.join(root, direc)
-                # Якщо папка порожня, видаляємо
-                if not os.listdir(dir_path):
-                    os.rmdir(dir_path)
+            # Сценарій для невідомого розширення файлу
+            if ext.lower() not in extensions:
+                # Додаємо розширення в невідомі
+                unknown_ext.add(ext.lower())
+                # Сортування файлів з невідомим розширенням
+                shutil.move(os.path.join(root, new_name), dirs_paths['unknown'])
+                # Додавання файлу в словник
+                sorted_files['unknown'].append(new_name)
+                continue
+
+            # Додаємо розширення в відомі
+            known_ext.add(ext.lower())
+
+            # Сценарій для архіву
+            if ext.lower() in KNOWN_EXT['archives']:
+                arch_fold = os.path.splitext(new_name)[0]
+                arch_path = os.path.join(main_dir, 'archives', arch_fold)
+                # Створення директорії для архіву
+                os.makedirs(arch_path, exist_ok=True)
+                # Якщо архів справний, розпаковуємо
+                try:
+                    shutil.unpack_archive(new_file_path, arch_path)
+                    # Додавання файлу в словник
+                    sorted_files['archives'].append(new_name)
+                # Якщо архів битий, помилка
+                except Exception as e:
+                    print(f"Couldn't unpack archieve: {new_file_path}; Exception: {e}")
+                # Видаляємо архів
+                finally:
+                    os.remove(new_file_path)
+                continue
+
+            # Сценарій для решти файлів
+            for k, v in KNOWN_EXT.items():
+                if ext.lower() in v:
+                    shutil.move(os.path.join(root, new_name), dirs_paths[k])
+                    # Додавання файлу в словник
+                    sorted_files[k].append(new_name)
+    
+    # Видалення порожніх папок
+    for root, dirs, files in os.walk(main_dir, topdown=False):
+        dirs[:] = [d for d in dirs if d not in (dirs_paths.keys())]
+        for direc in dirs:
+            dir_path = os.path.join(root, direc)
+            # Якщо папка порожня, видаляємо
+            if not os.listdir(dir_path):
+                os.rmdir(dir_path)
     
     return known_ext, unknown_ext, sorted_files
 
@@ -128,7 +133,7 @@ def sorter():
     os.chdir(sys.argv[1])
 
     # Створення директорій та їх шляхів
-    dirs = ['images', 'documents', 'audio', 'video', 'archives']
+    dirs = ['images', 'documents', 'audio', 'video', 'archives', 'unknown']
     dirs_paths = {}
     for direc in dirs:
         os.makedirs(direc, exist_ok=True)
